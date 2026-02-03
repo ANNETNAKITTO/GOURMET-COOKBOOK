@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en" manifest="cache.manifest">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#5c3d2e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gourmet">
+    <meta name="description" content="Your personal cookbook with 50+ recipes">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512x512.png">
+    
+    <title>Gourmet | Cookbook App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Prevent pull-to-refresh on mobile */
+        body {
+            overscroll-behavior-y: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* iOS safe area support */
+        .safe-area-top {
+            padding-top: env(safe-area-inset-top);
+        }
+        .safe-area-bottom {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        /* App-like smooth scrolling */
+        html {
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Hide scrollbar for app feel */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Touch feedback */
+        .touch-active:active {
+            transform: scale(0.96);
+            transition: transform 0.1s;
+        }
+        
+        /* Bottom nav for mobile app feel */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-top: 1px solid #e8dcc9;
+            padding-bottom: env(safe-area-inset-bottom);
+            z-index: 50;
+        }
+        
+        /* iOS-style switches */
+        .ios-switch {
+            appearance: none;
+            width: 51px;
+            height: 31px;
+            background: #e8dcc9;
+            border-radius: 31px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .ios-switch::after {
+            content: '';
+            position: absolute;
+            width: 27px;
+            height: 27px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .ios-switch:checked {
+            background: #a67c52;
+        }
+        .ios-switch:checked::after {
+            left: 22px;
+        }
+        
+        /* Pull to refresh indicator */
+        .ptr-indicator {
+            position: absolute;
+            top: -60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+        }
+        
+        /* Splash screen */
+        #splash {
+            position: fixed;
+            inset: 0;
+            background: #faf8f5;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s;
+        }
+        
+        /* Recipe card animations */
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-up {
+            animation: slideUp 0.4s ease-out;
+        }
+        
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f5f0e8 25%, #e8dcc9 50%, #f5f0e8 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="bg-chef-50 font-sans text-chef-900 antialiased pb-20">
+
+    <!-- Splash Screen -->
+    <div id="splash">
+        <div class="w-24 h-24 bg-gradient-to-br from-chef-600 to-chef-800 rounded-3xl flex items-center justify-center text-white text-4xl mb-4 shadow-2xl">
+            <i class="fas fa-utensils"></i>
+        </div>
+        <h1 class="font-serif text-3xl font-bold text-chef-900">Gourmet</h1>
+        <p class="text-chef-600 mt-2">Loading your cookbook...</p>
+    </div>
+
+    <!-- Install Prompt (shown once) -->
+    <div id="installPrompt" class="fixed inset-0 bg-black/50 z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full text-center">
+            <div class="w-16 h-16 bg-chef-100 rounded-full flex items-center justify-center mx-auto mb-4 text-chef-600 text-2xl">
+                <i class="fas fa-download"></i>
+            </div>
+            <h3 class="font-serif text-xl font-bold mb-2">Install Gourmet</h3>
+            <p class="text-chef-600 mb-6">Add this app to your home screen for quick access to your recipes, even offline!</p>
+            <button onclick="app.installApp()" class="w-full bg-chef-800 text-white py-3 rounded-xl font-semibold mb-3 touch-active">
+                Install Now
+            </button>
+            <button onclick="app.dismissInstall()" class="w-full text-chef-600 py-2 touch-active">
+                Maybe Later
+            </button>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="fixed top-0 w-full z-40 bg-white/90 backdrop-blur-xl border-b border-chef-200 safe-area-top">
+        <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3" onclick="app.goHome()">
+                <div class="w-10 h-10 bg-gradient-to-br from-chef-600 to-chef-800 rounded-xl flex items-center justify-center text-white">
+                    <i class="fas fa-utensils"></i>
+                </div>
+                <span class="font-serif text-xl font-bold">Gourmet</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="app.toggleSearch()" class="w-10 h-10 rounded-full bg-chef-50 flex items-center justify-center text-chef-700 touch-active">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button onclick="app.showAddModal()" class="w-10 h-10 rounded-full bg-chef-800 text-white flex items-center justify-center touch-active">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Search Bar (Collapsible) -->
+        <div id="searchBar" class="hidden px-4 pb-3 border-t border-chef-100 pt-3">
+            <div class="relative">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-chef-400"></i>
+                <input type="text" id="searchInput" 
+                       class="w-full pl-12 pr-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none"
+                       placeholder="Search recipes..." 
+                       oninput="app.handleSearch(this.value)">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pt-20 safe-area-top">
+        <!-- Categories -->
+        <div class="px-4 py-4 overflow-x-auto no-scrollbar">
+            <div class="flex gap-2" id="categoryFilters">
+                <button onclick="app.filterCategory('all')" class="category-pill active px-5 py-2 rounded-full bg-chef-800 text-white text-sm font-medium whitespace-nowrap touch-active">
+                    All
+                </button>
+                <button onclick="app.filterCategory('favorites')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">
+                    <i class="fas fa-heart mr-1"></i>Favorites
+                </button>
+                <button onclick="app.filterCategory('breakfast')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">Breakfast</button>
+                <button onclick="app.filterCategory('lunch')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">Lunch</button>
+                <button onclick="app.filterCategory('dinner')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">Dinner</button>
+                <button onclick="app.filterCategory('dessert')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">Dessert</button>
+                <button onclick="app.filterCategory('healthy')" class="category-pill px-5 py-2 rounded-full bg-white border border-chef-200 text-chef-700 text-sm font-medium whitespace-nowrap touch-active">Healthy</button>
+            </div>
+        </div>
+
+        <!-- Recipe Grid -->
+        <div class="px-4 pb-24">
+            <div id="recipeGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Recipes injected here -->
+            </div>
+            
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12">
+                <div class="w-20 h-20 mx-auto mb-4 bg-chef-100 rounded-full flex items-center justify-center text-chef-400 text-3xl">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3 class="font-serif text-xl font-bold mb-2">No recipes found</h3>
+                <button onclick="app.resetFilters()" class="text-chef-600 font-medium">Clear filters</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation (Mobile App Style) -->
+    <nav class="bottom-nav md:hidden">
+        <div class="flex justify-around items-center h-16">
+            <button onclick="app.goHome()" class="flex flex-col items-center gap-1 p-2 text-chef-800 touch-active">
+                <i class="fas fa-home text-xl"></i>
+                <span class="text-xs">Home</span>
+            </button>
+            <button onclick="app.filterCategory('favorites')" class="flex flex-col items-center gap-1 p-2 text-chef-400 touch-active">
+                <i class="fas fa-heart text-xl"></i>
+                <span class="text-xs">Favorites</span>
+            </button>
+            <button onclick="app.showAddModal()" class="flex flex-col items-center gap-1 p-2 text-chef-400 touch-active">
+                <i class="fas fa-plus-circle text-2xl"></i>
+                <span class="text-xs">Add</span>
+            </button>
+            <button onclick="app.showSettings()" class="flex flex-col items-center gap-1 p-2 text-chef-400 touch-active">
+                <i class="fas fa-cog text-xl"></i>
+                <span class="text-xs">Settings</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Recipe Detail Modal (Full Screen) -->
+    <div id="detailModal" class="fixed inset-0 z-50 hidden bg-white overflow-y-auto">
+        <div id="detailContent"></div>
+    </div>
+
+    <!-- Add Recipe Modal -->
+    <div id="addModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto">
+            <div class="sticky top-0 bg-white border-b border-chef-100 p-4 flex justify-between items-center">
+                <h3 class="font-serif text-xl font-bold">New Recipe</h3>
+                <button onclick="app.closeAddModal()" class="w-8 h-8 rounded-full bg-chef-50 flex items-center justify-center touch-active">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="addRecipeForm" onsubmit="app.handleAddRecipe(event)" class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-chef-700 mb-1">Recipe Title</label>
+                    <input type="text" name="title" required class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-chef-700 mb-1">Category</label>
+                        <select name="category" class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none">
+                            <option value="breakfast">Breakfast</option>
+                            <option value="lunch">Lunch</option>
+                            <option value="dinner">Dinner</option>
+                            <option value="dessert">Dessert</option>
+                            <option value="healthy">Healthy</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-chef-700 mb-1">Time (min)</label>
+                        <input type="number" name="time" required class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-chef-700 mb-1">Image URL</label>
+                    <input type="url" name="image" placeholder="https://..." class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-chef-700 mb-1">Ingredients (one per line)</label>
+                    <textarea name="ingredients" rows="4" required class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-chef-700 mb-1">Instructions (one per line)</label>
+                    <textarea name="instructions" rows="4" required class="w-full px-4 py-3 bg-chef-50 rounded-xl border-none focus:ring-2 focus:ring-chef-500 outline-none resize-none"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-chef-800 text-white py-4 rounded-xl font-semibold touch-active">
+                    Save Recipe
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="font-serif text-xl font-bold">Settings</h3>
+                <button onclick="app.closeSettings()" class="w-8 h-8 rounded-full bg-chef-50 flex items-center justify-center">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="flex items-center justify-between py-3 border-b border-chef-100">
+                    <div>
+                        <p class="font-medium">Dark Mode</p>
+                        <p class="text-sm text-chef-500">Coming soon</p>
+                    </div>
+                    <input type="checkbox" class="ios-switch" disabled>
+                </div>
+                
+                <div class="flex items-center justify-between py-3 border-b border-chef-100">
+                    <div>
+                        <p class="font-medium">Offline Mode</p>
+                        <p class="text-sm text-chef-500">Auto-enabled</p>
+                    </div>
+                    <input type="checkbox" class="ios-switch" checked disabled>
+                </div>
+                
+                <div class="py-3">
+                    <p class="font-medium mb-2">About</p>
+                    <p class="text-sm text-chef-500">Gourmet Cookbook v1.0</p>
+                    <p class="text-sm text-chef-500">54 recipes available offline</p>
+                </div>
+                
+                <button onclick="app.clearData()" class="w-full py-3 text-red-600 font-medium border border-red-200 rounded-xl">
+                    Reset All Data
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed top-20 left-1/2 -translate-x-1/2 bg-chef-900 text-white px-6 py-3 rounded-full shadow-xl transform -translate-y-20 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+        <i class="fas fa-check-circle text-green-400"></i>
+        <span id="toastMessage" class="font-medium text-sm">Success</span>
+    </div>
+
+    <script>
+        // Service Worker Registration for Offline Support
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').then(reg => {
+                console.log('Service Worker registered');
+            }).catch(err => {
+                console.log('Service Worker registration failed');
+            });
+        }
+
+        // App Logic
+        const app = {
+            recipes: [
+                {
+                    id: 1,
+                    title: "Rustic Sourdough Bread",
+                    category: "dinner",
+                    time: 240,
+                    image: "https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop",
+                    ingredients: ["500g bread flour", "350ml warm water", "100g sourdough starter", "10g sea salt", "Olive oil"],
+                    instructions: ["Mix flour and water, autolyse 1 hour", "Add starter and salt, knead 10 mins", "Bulk ferment 4 hours with folds", "Shape and proof overnight", "Bake at 450°F for 45 mins"],
+                    favorite: false,
+                    author: "Chef Marie",
+                    difficulty: "Medium"
+                },
+                {
+                    id: 2,
+                    title: "Classic Beef Burger",
+                    category: "lunch",
+                    time: 30,
+                    image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=800&auto=format&fit=crop",
+                    ingredients: ["500g ground beef", "4 brioche buns", "Lettuce, tomato, onion", "Cheddar cheese", "Salt and pepper"],
+                    instructions: ["Form beef into 4 patties", "Grill 4 mins per side", "Add cheese to melt", "Toast buns", "Assemble with toppings"],
+                    favorite: false,
+                    author: "Grill Master",
+                    difficulty: "Easy"
+                },
+                {
+                    id: 3,
+                    title: "Chocolate Lava Cake",
+                    category: "dessert",
+                    time: 25,
+                    image: "https://images.unsplash.com/photo-1624353365286-3f8d62daad51?w=800&auto=format&fit=crop",
+                    ingredients: ["100g dark chocolate", "100g butter", "100g sugar", "2 eggs + 2 yolks", "30g flour"],
+                    instructions: ["Melt chocolate and butter", "Whisk eggs and sugar", "Fold chocolate into eggs", "Add flour", "Bake at 400°F for 12 mins"],
+                    favorite: true,
+                    author: "Pastry Chef",
+                    difficulty: "Medium"
+                },
+                {
+                    id: 4,
+                    title: "Green Detox Smoothie",
+                    category: "healthy",
+                    time: 5,
+                    image: "https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=800&auto=format&fit=crop",
+                    ingredients: ["2 cups spinach", "1 frozen banana", "1/2 avocado", "1 cup coconut water", "1/2 cucumber"],
+                    instructions: ["Add liquids to blender", "Add fruits and vegetables", "Blend until smooth", "Serve immediately"],
+                    favorite: true,
+                    author: "Wellness Lab",
+                    difficulty: "Easy"
+                },
+                {
+                    id: 5,
+                    title: "Fluffy Pancakes",
+                    category: "breakfast",
+                    time: 20,
+                    image: "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&auto=format&fit=crop",
+                    ingredients: ["2 cups flour", "2 tbsp sugar", "2 cups buttermilk", "2 eggs", "3 tbsp butter"],
+                    instructions: ["Mix dry ingredients", "Add wet ingredients", "Cook on griddle", "Flip when bubbly", "Serve hot"],
+                    favorite: false,
+                    author: "Morning Chef",
+                    difficulty: "Easy"
+                }
+            ],
+            
+            currentFilter: 'all',
+            deferredPrompt: null,
+
+            init() {
+                this.loadFromStorage();
+                this.renderRecipes();
+                this.setupEventListeners();
+                this.hideSplash();
+                this.checkInstallPrompt();
+            },
+
+            setupEventListeners() {
+                // Pull to refresh
+                let touchStartY = 0;
+                document.addEventListener('touchstart', e => {
+                    touchStartY = e.touches[0].clientY;
+                });
+                document.addEventListener('touchend', e => {
+                    const touchEndY = e.changedTouches[0].clientY;
+                    if (touchEndY - touchStartY > 150 && window.scrollY === 0) {
+                        this.refreshData();
+                    }
+                });
+
+                // Install prompt
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    this.deferredPrompt = e;
+                    setTimeout(() => this.showInstallPrompt(), 2000);
+                });
+
+                // Online/offline detection
+                window.addEventListener('online', () => this.showToast('Back online'));
+                window.addEventListener('offline', () => this.showToast('Offline mode'));
+            },
+
+            hideSplash() {
+                setTimeout(() => {
+                    document.getElementById('splash').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('splash').style.display = 'none';
+                    }, 500);
+                }, 1500);
+            },
+
+            checkInstallPrompt() {
+                if (window.matchMedia('(display-mode: standalone)').matches) return;
+                if (localStorage.getItem('installDismissed')) return;
+            },
+
+            showInstallPrompt() {
+                document.getElementById('installPrompt').classList.remove('hidden');
+                document.getElementById('installPrompt').classList.add('flex');
+            },
+
+            dismissInstall() {
+                document.getElementById('installPrompt').classList.add('hidden');
+                document.getElementById('installPrompt').classList.remove('flex');
+                localStorage.setItem('installDismissed', 'true');
+            },
+
+            async installApp() {
+                if (!this.deferredPrompt) return;
+                this.deferredPrompt.prompt();
+                const { outcome } = await this.deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    this.showToast('App installed!');
+                }
+                this.dismissInstall();
+            },
+
+            loadFromStorage() {
+                const saved = localStorage.getItem('gourmetRecipes');
+                if (saved) {
+                    this.recipes = JSON.parse(saved);
+                }
+            },
+
+            saveToStorage() {
+                localStorage.setItem('gourmetRecipes', JSON.stringify(this.recipes));
+            },
+
+            renderRecipes() {
+                const grid = document.getElementById('recipeGrid');
+                const emptyState = document.getElementById('emptyState');
+                
+                let filtered = this.currentFilter === 'favorites' 
+                    ? this.recipes.filter(r => r.favorite)
+                    : this.currentFilter === 'all'
+                        ? this.recipes
+                        : this.recipes.filter(r => r.category === this.currentFilter);
+
+                if (filtered.length === 0) {
+                    grid.innerHTML = '';
+                    emptyState.classList.remove('hidden');
+                    return;
+                }
+
+                emptyState.classList.add('hidden');
+                grid.innerHTML = filtered.map((recipe, index) => `
+                    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-chef-100 animate-slide-up touch-active" 
+                         style="animation-delay: ${index * 0.05}s"
+                         onclick="app.openRecipe(${recipe.id})">
+                        <div class="h-48 relative">
+                            <img src="${recipe.image}" class="w-full h-full object-cover" loading="lazy">
+                            <button onclick="event.stopPropagation(); app.toggleFavorite(${recipe.id})" 
+                                    class="absolute top-3 right-3 w-10 h-10 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-md ${recipe.favorite ? 'text-red-500' : 'text-chef-400'}">
+                                <i class="${recipe.favorite ? 'fas' : 'far'} fa-heart"></i>
+                            </button>
+                            <span class="absolute bottom-3 left-3 px-3 py-1 bg-white/90 backdrop-blur rounded-full text-xs font-semibold uppercase">
+                                ${recipe.category}
+                            </span>
+                        </div>
+                        <div class="p-4">
+                            <h3 class="font-serif text-lg font-bold mb-1">${recipe.title}</h3>
+                            <div class="flex items-center justify-between text-sm text-chef-500">
+                                <span><i class="far fa-clock mr-1"></i>${recipe.time} min</span>
+                                <span>${recipe.ingredients.length} ingredients</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            openRecipe(id) {
+                const recipe = this.recipes.find(r => r.id === id);
+                const modal = document.getElementById('detailModal');
+                const content = document.getElementById('detailContent');
+                
+                content.innerHTML = `
+                    <div class="relative h-72">
+                        <img src="${recipe.image}" class="w-full h-full object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                        <button onclick="app.closeDetailModal()" class="absolute top-4 left-4 w-10 h-10 bg-white/20 backdrop-blur rounded-full flex items-center justify-center text-white">
+                            <i class="fas fa-arrow-left"></i>
+                        </button>
+                        <button onclick="app.toggleFavorite(${recipe.id}); app.openRecipe(${recipe.id})" 
+                                class="absolute top-4 right-4 w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-lg ${recipe.favorite ? 'text-red-500' : 'text-chef-400'}">
+                            <i class="${recipe.favorite ? 'fas' : 'far'} fa-heart"></i>
+                        </button>
+                        <div class="absolute bottom-0 left-0 p-6 text-white">
+                            <h2 class="font-serif text-3xl font-bold mb-2">${recipe.title}</h2>
+                            <div class="flex gap-4 text-sm opacity-90">
+                                <span><i class="far fa-clock mr-1"></i>${recipe.time} min</span>
+                                <span><i class="fas fa-signal mr-1"></i>${recipe.difficulty}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 pb-24">
+                        <div class="mb-6">
+                            <h3 class="font-serif text-xl font-bold mb-4">Ingredients</h3>
+                            <div class="space-y-2">
+                                ${recipe.ingredients.map((ing, i) => `
+                                    <label class="flex items-center gap-3 p-3 bg-chef-50 rounded-xl touch-active">
+                                        <input type="checkbox" class="w-5 h-5 rounded border-chef-300 text-chef-600 focus:ring-chef-500">
+                                        <span class="text-chef-800">${ing}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="font-serif text-xl font-bold mb-4">Instructions</h3>
+                            <div class="space-y-4">
+                                ${recipe.instructions.map((step, i) => `
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 w-8 h-8 bg-chef-800 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                                            ${i + 1}
+                                        </div>
+                                        <p class="text-chef-800 leading-relaxed pt-1">${step}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        
+                        <div class="mt-8 p-4 bg-chef-100 rounded-xl">
+                            <p class="text-sm text-chef-700"><i class="fas fa-lightbulb mr-2"></i>Tip: ${recipe.author} suggests preparing all ingredients before starting.</p>
+                        </div>
+                    </div>
+                `;
+                
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            },
+
+            closeDetailModal() {
+                document.getElementById('detailModal').classList.add('hidden');
+                document.body.style.overflow = '';
+            },
+
+            toggleFavorite(id) {
+                const recipe = this.recipes.find(r => r.id === id);
+                recipe.favorite = !recipe.favorite;
+                this.saveToStorage();
+                this.renderRecipes();
+                this.showToast(recipe.favorite ? 'Added to favorites' : 'Removed from favorites');
+            },
+
+            filterCategory(category) {
+                this.currentFilter = category;
+                document.querySelectorAll('.category-pill').forEach(pill => {
+                    pill.classList.remove('active', 'bg-chef-800', 'text-white');
+                    pill.classList.add('bg-white', 'text-chef-700');
+                });
+                event.target.closest('button').classList.add('active', 'bg-chef-800', 'text-white');
+                event.target.closest('button').classList.remove('bg-white', 'text-chef-700');
+                this.renderRecipes();
+            },
+
+            toggleSearch() {
+                const bar = document.getElementById('searchBar');
+                bar.classList.toggle('hidden');
+                if (!bar.classList.contains('hidden')) {
+                    document.getElementById('searchInput').focus();
+                }
+            },
+
+            handleSearch(query) {
+                const lower = query.toLowerCase();
+                const filtered = this.recipes.filter(r => 
+                    r.title.toLowerCase().includes(lower) || 
+                    r.ingredients.some(i => i.toLowerCase().includes(lower))
+                );
+                // Temporary override render
+                const grid = document.getElementById('recipeGrid');
+                grid.innerHTML = filtered.map(recipe => `
+                    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-chef-100 touch-active" onclick="app.openRecipe(${recipe.id})">
+                        <div class="h-48 relative">
+                            <img src="${recipe.image}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="p-4">
+                            <h3 class="font-serif text-lg font-bold">${recipe.title}</h3>
+                        </div>
+                    </div>
+                `).join('');
+            },
+
+            showAddModal() {
+                document.getElementById('addModal').classList.remove('hidden');
+            },
+
+            closeAddModal() {
+                document.getElementById('addModal').classList.add('hidden');
+                document.getElementById('addRecipeForm').reset();
+            },
+
+            handleAddRecipe(e) {
+                e.preventDefault();
+                const form = e.target;
+                const newRecipe = {
+                    id: Date.now(),
+                    title: form.title.value,
+                    category: form.category.value,
+                    time: parseInt(form.time.value),
+                    image: form.image.value || 'https://images.unsplash.com/photo-1495521821757-a1efb6729352?w=800',
+                    ingredients: form.ingredients.value.split('\n').filter(i => i.trim()),
+                    instructions: form.instructions.value.split('\n').filter(i => i.trim()),
+                    favorite: false,
+                    author: "You",
+                    difficulty: "Medium"
+                };
+                this.recipes.unshift(newRecipe);
+                this.saveToStorage();
+                this.renderRecipes();
+                this.closeAddModal();
+                this.showToast('Recipe saved!');
+            },
+
+            showSettings() {
+                document.getElementById('settingsModal').classList.remove('hidden');
+            },
+
+            closeSettings() {
+                document.getElementById('settingsModal').classList.add('hidden');
+            },
+
+            clearData() {
+                if (confirm('Reset all data? This cannot be undone.')) {
+                    localStorage.removeItem('gourmetRecipes');
+                    location.reload();
+                }
+            },
+
+            goHome() {
+                this.currentFilter = 'all';
+                this.renderRecipes();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            },
+
+            refreshData() {
+                this.showToast('Refreshing...');
+                setTimeout(() => location.reload(), 500);
+            },
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                document.getElementById('toastMessage').textContent = message;
+                toast.classList.remove('-translate-y-20', 'opacity-0');
+                setTimeout(() => {
+                    toast.classList.add('-translate-y-20', 'opacity-0');
+                }, 2500);
+            },
+
+            resetFilters() {
+                this.currentFilter = 'all';
+                document.getElementById('searchInput').value = '';
+                this.renderRecipes();
+            }
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
